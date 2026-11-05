@@ -1,0 +1,86 @@
+# Football match outcome model - project configuration
+#
+# Data source: football-data.co.uk (free CSV files, results + match stats + bookmaker odds)
+# URL pattern: https://www.football-data.co.uk/mmz4281/{season_code}/{league_code}.csv
+
+source:
+  base_url: "https://www.football-data.co.uk/mmz4281"
+  fixtures_url: "https://www.football-data.co.uk/fixtures.csv"
+  request_timeout_s: 30
+  polite_delay_s: 1.0        # pause between downloads, to be kind to a free service
+
+# Top 10 European leagues (by UEFA association ranking / popularity)
+leagues:
+  E0:  {name: "Premier League", country: "England"}
+  SP1: {name: "La Liga",        country: "Spain"}
+  I1:  {name: "Serie A",        country: "Italy"}
+  D1:  {name: "Bundesliga",     country: "Germany"}
+  F1:  {name: "Ligue 1",        country: "France"}
+  N1:  {name: "Eredivisie",     country: "Netherlands"}
+  P1:  {name: "Primeira Liga",  country: "Portugal"}
+  B1:  {name: "Pro League",     country: "Belgium"}
+  T1:  {name: "Super Lig",      country: "Turkey"}
+  G1:  {name: "Super League",   country: "Greece"}
+
+# Seasons are given by their starting year: 2012 -> 2012/13 (code "1213")
+seasons:
+  first: 2012
+  last: 2026                  # current season (partial)
+
+# Walk-forward evaluation: for each test season, train only on earlier seasons
+evaluation:
+  test_seasons: [2022, 2023, 2024, 2025]
+
+features:
+  rolling_window: 6           # last N matches for form features
+  min_matches_for_form: 3
+
+elo:
+  initial_rating: 1500
+  promoted_rating_offset: -100  # teams entering a league start below the league mean
+  k_factor: 20
+  home_advantage: 60
+  season_regression: 0.25     # pull ratings 25% back to the league mean between seasons
+
+dixon_coles:
+  half_life_days: 365         # time-decay weighting of past matches
+  train_window_days: 1095     # use the last 3 years of matches
+  refit_every_days: 28
+
+lightgbm:
+  n_estimators: 400
+  learning_rate: 0.03
+  num_leaves: 15
+  min_child_samples: 60
+  subsample: 0.8
+  subsample_freq: 1
+  colsample_bytree: 0.8
+  reg_lambda: 1.0
+
+# --------------------------------------------------------------------------
+# Player-level data (API-Football, https://www.api-football.com)
+# The API key is read from the API_FOOTBALL_KEY environment variable or a
+# `.env` file in the project root. Never commit the key.
+players:
+  base_url: "https://v3.football.api-sports.io"
+  # Free plan: 100 requests/day and ~10 requests/minute, recent seasons only.
+  daily_request_budget: 95     # stop before hitting the plan limit
+  min_seconds_between_requests: 6.5
+  fixtures_per_batch: 20       # /fixtures?ids=... returns lineups + player stats for up to 20 matches
+  # Which leagues/seasons to collect. Start small on the free plan.
+  # Free plan: ~85 matches/day, so two Premier League seasons take about 9 days.
+  collect:
+    E0: [2023, 2024]
+  # API-Football league ids for our football-data.co.uk codes
+  league_ids:
+    E0: 39
+    SP1: 140
+    I1: 135
+    D1: 78
+    F1: 61
+    N1: 88
+    P1: 94
+    B1: 144
+    T1: 203
+    G1: 197
+  form_matches: 5              # player form window (team matches)
